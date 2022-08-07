@@ -1,0 +1,39 @@
+# load required packages
+library(tidyverse)
+library(syuzhet)
+library(tidytext)
+library(tm)
+
+# import text dataset
+df <- DecemberTweet2021
+text.df <- tibble(text = str_to_lower(df$Tweet))
+
+
+# Clean text
+corpus <- iconv(text.df$text,from = "utf-8-mac",  to = "ASCII//TRANSLIT")
+corpus <- Corpus(VectorSource(corpus))
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, tolower)
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, removePunctuation)
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, removeNumbers)
+inspect(corpus[1:5])
+
+cleanset <- tm_map(corpus, removeWords, c(stopwords('english')))
+inspect(cleanset[1:5])
+
+removeURL <- function(x) gsub('http[[:alnum:]]*', '', x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:5])
+
+#Changing to dataframe
+clean.df <- data.frame(tweet = sapply(cleanset, as.character), stringsAsFactors = FALSE)
+tokenized_tweets <- unnest_tokens(clean.df, input = "tweet", output = "words")
+
+monthsD <- tokenized_tweets %>%
+  na.omit(tokenized_tweets)%>%
+  count(words, sort = TRUE)
