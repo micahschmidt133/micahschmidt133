@@ -1,0 +1,74 @@
+# load required packages
+library(tidyverse)
+library(syuzhet)
+library(tidytext)
+
+# import text dataset
+df <- mainFile
+text.df <- tibble(text = str_to_lower(df$tweet))
+
+# analyze sentiments using the syuzhet package based on the NRC sentiment dictionary
+emotions <- get_nrc_sentiment(text.df$text)
+emo_bar <- colSums(emotions)
+emo_sum <- data.frame(count=emo_bar, emotion=names(emo_bar))
+
+# create a barplot showing the counts for each of eight different emotions and positive/negative rating
+ggplot(emo_sum, aes(x = reorder(emotion, -count), y = count)) + 
+  geom_bar(stat = 'identity') 
+
+
+#emotion display
+displayEmotion <- text.df %>% unnest_tokens(output = word, input = text) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(word, sentiment, sort = TRUE)
+
+nrc_joy <- text.df %>% unnest_tokens(output = word, input = text) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  filter(sentiment == "joy") %>%
+  count(word, sort = TRUE)
+
+#moral 
+library("quanteda")
+data(data_dictionary_MFD, package = "quanteda.dictionaries")
+emfd <- eMFD_wordlist
+reader <- mainFile2
+
+#do this for each indiv
+CareNeg <- displayEmotion %>% inner_join(emfd) %>%
+  count(word, care_sent, sort = TRUE) %>%
+  filter(care_sent >= 0) %>%
+  top_n(10000)
+
+
+# select top 30 words by sentiment
+joyDisplay <- displayEmotion %>% 
+  group_by(sentiments) %>% 
+  slice_max(order_by = n, n = 30) %>% 
+  ungroup() %>% 
+  mutate(word = reorder(word, n)) 
+joyDisplay
+
+# sentiment analysis with the tidytext package using the "bing" lexicon
+bing_word_counts <- text.df %>% unnest_tokens(output = word, input = text) %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) 
+
+# select top 30 words by sentiment
+bing_top_30_words_by_sentiment <- bing_word_counts %>% 
+  group_by(sentiment) %>% 
+  slice_max(order_by = n, n = 30) %>% 
+  ungroup() %>% 
+  mutate(word = reorder(word, n)) 
+bing_top_30_words_by_sentiment
+
+# create a barplot showing contribution of words to sentiment
+bing_top_30_words_by_sentiment %>% 
+  ggplot(aes(word, n, fill = sentiment)) + 
+  geom_col(show.legend = FALSE) + 
+  facet_wrap(~sentiment, scales = "free_y") + 
+  labs(y = "Contribution to sentiment", x = NULL) + 
+  coord_flip() 
+
+
+
+
