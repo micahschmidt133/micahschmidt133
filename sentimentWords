@@ -1,0 +1,119 @@
+library(tidytext)
+library(tm)
+library(dplyr)
+library('igraph')
+library('ggraph')
+
+df <- file2
+text.df <- tibble(text = str_to_lower(df$Tweet))
+
+# Clean text
+corpus <- iconv(text.df$text,from = "utf-8-mac",  to = "ASCII//TRANSLIT")
+corpus <- Corpus(VectorSource(corpus))
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, tolower)
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, removePunctuation)
+inspect(corpus[1:5])
+
+corpus <- tm_map(corpus, removeNumbers)
+inspect(corpus[1:5])
+
+cleanset <- tm_map(corpus, removeWords, c(stopwords('english')))
+inspect(cleanset[1:5])
+
+removeURL <- function(x) gsub('http[[:alnum:]]*', '', x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:5])
+
+#Changing to dataframe
+clean.df <- data.frame(tweet = sapply(cleanset, as.character), stringsAsFactors = FALSE)
+tokenized_tweets <- unnest_tokens(clean.df, input = "tweet", output = "words")
+
+trueData <- tokenized_tweets %>%
+  na.omit(tokenized_tweets)%>%
+  count(words, sort = TRUE)
+
+
+#graph
+trueData %>% 
+  count(words, sort = TRUE) %>%
+  rename(count = n) %>%
+  filter(count > 5) %>%
+  mutate(words = reorder(words, count)) %>%
+  ggplot(aes(x = count, y = words)) + 
+  geom_col() + 
+  labs(title = "n") + 
+  scale_x_continuous(breaks = seq(0, 50, 5))
+
+#bigram
+library(ggplot2)
+library(igraph)
+library(ggraph)
+library(ngramrr)
+
+tweets_bigram <- clean.df %>%
+  na.omit(clean.df)%>%
+  unnest_tokens(bigram, tweet, token = 'ngrams', n = 2) 
+head(tweets_bigram)
+
+tweets_bigram <- tweets_bigram %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+head(tweets_bigram)
+
+bigram_counts <- tweets_bigram %>%
+  count(word1, word2, sort = TRUE)
+head(bigram_counts)
+
+bi_graph <- bigram_counts %>%
+  filter(n > 130) %>% 
+  graph_from_data_frame()
+ggraph(bi_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+#bi-gram containing real 
+library(ggplot2)
+library(igraph)
+library(ggraph)
+library(ngramrr)
+
+tweets_bigram <- clean.df %>%
+  na.omit(clean.df)%>%
+  unnest_tokens(bigram, tweet, token = 'ngrams', n = 2) 
+head(tweets_bigram)
+
+tweets_bigram <- tweets_bigram %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(word1 == "real") %>%
+  filter(!word2 %in% stop_words$word)
+head(tweets_bigram)
+
+bigram_counts <- tweets_bigram %>%
+  count(word1, word2, sort = TRUE)
+head(bigram_counts)
+
+bi_graph <- bigram_counts %>%
+  filter(n > 8) %>% 
+  graph_from_data_frame()
+ggraph(bi_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+
+#worldcloud
+library('ggwordcloud')
+trueData %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 500) %>%
+  ggplot(aes(label = word, size = n, color = n)) + 
+  geom_text_wordcloud() + 
+  scale_size_area(max_size = 50) 
+
+
